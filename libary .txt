@@ -1,0 +1,337 @@
+local Library = {}
+Library.__index = Library
+
+function Library.new(title)
+    local self = setmetatable({}, Library)
+    
+    local Players = game:GetService("Players")
+    local UserInputService = game:GetService("UserInputService")
+    local CoreGui = game:GetService("CoreGui")
+    local TweenService = game:GetService("TweenService")
+    local P = Players.LocalPlayer
+
+    local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+    if not isMobile then
+        P:Kick("This is only for mobile/ipad")
+        return
+    end
+
+    self.Title = title or "Cater’s React Script"
+    self.Unlocked = false
+    self.ResetButtonPosition = nil
+
+    -- Dedicated screen layer for crisp, bright notifications
+    local notifGui = Instance.new("ScreenGui")
+    notifGui.Name = "LidoSafeNotificationGui"
+    notifGui.ResetOnSpawn = false
+    notifGui.DisplayOrder = 999999
+    notifGui.IgnoreGuiInset = true
+    pcall(function()
+        notifGui.Parent = (gethui and gethui()) or CoreGui
+    end)
+    if not notifGui.Parent then
+        notifGui.Parent = P:WaitForChild("PlayerGui")
+    end
+
+    function self:Notify(message, subtext)
+        local singleNotifGui = Instance.new("ScreenGui")
+        singleNotifGui.Name = "ActiveLidoNotif"
+        singleNotifGui.ResetOnSpawn = false
+        singleNotifGui.DisplayOrder = 999999
+        singleNotifGui.IgnoreGuiInset = true
+        pcall(function()
+            singleNotifGui.Parent = (gethui and gethui()) or CoreGui
+        end)
+        if not singleNotifGui.Parent then
+            singleNotifGui.Parent = P:WaitForChild("PlayerGui")
+        end
+
+        local notifFrame = Instance.new("Frame")
+        notifFrame.Name = "NotifBox"
+        notifFrame.Size = UDim2.new(0, 200, 0, subtext and 52 or 40)
+        notifFrame.Position = UDim2.new(1, 20, 1, subtext and -65 or -50)
+        notifFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+        notifFrame.BackgroundTransparency = 0.05
+        notifFrame.BorderSizePixel = 0
+        notifFrame.Visible = true
+        notifFrame.Active = true
+        notifFrame.ZIndex = 9999
+        notifFrame.Parent = singleNotifGui
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 8)
+        corner.Parent = notifFrame
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(0, 190, 255)
+        stroke.Thickness = 1.5
+        stroke.Parent = notifFrame
+
+        local gradient = Instance.new("UIGradient")
+        gradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 170, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 80, 255))
+        })
+        gradient.Parent = stroke
+
+        local accent = Instance.new("Frame")
+        accent.Size = UDim2.new(0, 4, 1, 0)
+        accent.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        accent.BorderSizePixel = 0
+        accent.ZIndex = 10000
+        accent.Parent = notifFrame
+
+        local accentCorner = Instance.new("UICorner")
+        accentCorner.CornerRadius = UDim.new(0, 3)
+        accentCorner.Parent = accent
+
+        local titleLabel = Instance.new("TextLabel")
+        titleLabel.Size = UDim2.new(1, -15, 0, 16)
+        titleLabel.Position = UDim2.new(0, 10, 0, 4)
+        titleLabel.BackgroundTransparency = 1
+        titleLabel.Text = self.Title
+        titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        titleLabel.TextSize = 11
+        titleLabel.Font = Enum.Font.GothamBold
+        titleLabel.ZIndex = 10000
+        titleLabel.Parent = notifFrame
+
+        local descLabel = Instance.new("TextLabel")
+        descLabel.Size = UDim2.new(1, -15, 0, subtext and 16 or 18)
+        descLabel.Position = UDim2.new(0, 10, 0, 18)
+        descLabel.BackgroundTransparency = 1
+        descLabel.Text = message
+        descLabel.TextColor3 = Color3.fromRGB(220, 220, 230)
+        descLabel.TextSize = 9.5
+        descLabel.Font = Enum.Font.Gotham
+        descLabel.ZIndex = 10000
+        descLabel.Parent = notifFrame
+
+        if subtext then
+            local subLabel = Instance.new("TextLabel")
+            subLabel.Size = UDim2.new(1, -15, 0, 14)
+            subLabel.Position = UDim2.new(0, 10, 0, 34)
+            subLabel.BackgroundTransparency = 1
+            subLabel.Text = subtext
+            subLabel.TextColor3 = Color3.fromRGB(0, 190, 255)
+            subLabel.TextSize = 8.5
+            subLabel.Font = Enum.Font.GothamBold
+            subLabel.ZIndex = 10000
+            subLabel.Parent = notifFrame
+        end
+
+        local targetY = subtext and -65 or -50
+        local tweenIn = TweenService:Create(notifFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Position = UDim2.new(1, -215, 1, targetY)
+        })
+        tweenIn:Play()
+
+        task.delay(subtext and 6 or 3, function()
+            local tweenOut = TweenService:Create(notifFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+                Position = UDim2.new(1, 20, 1, targetY)
+            })
+            tweenOut:Play()
+            tweenOut.Completed:Connect(function()
+                singleNotifGui:Destroy()
+            end)
+        end)
+    end
+
+    -- Startup instruction notification
+    task.delay(0.5, function()
+        self:Notify("Loaded Successfully!", "Commands: /e unlock | /e lock | /e reset")
+    end)
+
+    P.Chatted:Connect(function(msg)
+        local lowerMsg = msg:lower()
+        if lowerMsg == "/e unlock" then
+            self.Unlocked = true
+            self:Notify("Unlocked! You can drag buttons.")
+        elseif lowerMsg == "/e lock" then
+            self.Unlocked = false
+            self:Notify("Locked! Button positions secured.")
+        elseif lowerMsg == "/e reset" then
+            if self.ResetButtonPosition then
+                self.ResetButtonPosition()
+                self:Notify("Reset button positions to default!")
+            end
+        end
+    end)
+
+    function self:CreateMobileLayout(callbacks)
+        local playerGui = P:WaitForChild("PlayerGui", 10)
+        local touchControlFrame
+        
+        while not touchControlFrame do
+            local startFolder = playerGui and playerGui:FindFirstChild("Start", true)
+            touchControlFrame = startFolder and startFolder:FindFirstChild("TouchControlFrame", true)
+            if not touchControlFrame then
+                task.wait(0.2)
+            end
+        end
+
+        local persistentParent = (gethui and gethui()) or CoreGui:FindFirstChild("CoreGui") or CoreGui
+        local persistentGui = CoreGui:FindFirstChild("LidoPersistentGui")
+        if not persistentGui then
+            persistentGui = Instance.new("ScreenGui")
+            persistentGui.Name = "LidoPersistentGui"
+            persistentGui.ResetOnSpawn = false
+            persistentGui.DisplayOrder = 50
+            persistentGui.IgnoreGuiInset = true
+            pcall(function()
+                persistentGui.Parent = persistentParent
+            end)
+            if not persistentGui.Parent then
+                persistentGui.Parent = playerGui
+            end
+        end
+
+        local oldFrame = persistentGui:FindFirstChild("MainFrame")
+        if oldFrame then oldFrame:Destroy() end
+
+        local MainFrame = Instance.new("Frame")
+        MainFrame.Name = "MainFrame"
+        MainFrame.BackgroundTransparency = 1
+        MainFrame.Parent = persistentGui
+
+        local function makeButton(customName, size, position, decalId, iconScale)
+            local btn = Instance.new("ImageButton")
+            btn.Name = customName
+            btn.Size = size
+            btn.AnchorPoint = Vector2.new(0.5, 0.5)
+            btn.Position = position
+            btn.Style = Enum.ButtonStyle.Custom
+            btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            btn.BackgroundTransparency = 1
+            btn.BorderColor3 = Color3.fromRGB(27, 42, 53)
+            btn.BorderMode = Enum.BorderMode.Outline
+            btn.BorderSizePixel = 1
+            btn.AutoButtonColor = true
+            btn.Active = true
+            btn.Selectable = true
+            btn.ZIndex = 2
+
+            btn.Image = "rbxassetid://12578143665"
+            btn.HoverImage = "rbxassetid://12578143665"
+            btn.PressedImage = "rbxassetid://12578165713"
+            btn.ImageTransparency = 0
+            btn.ScaleType = Enum.ScaleType.Stretch
+
+            if decalId then
+                local scale = iconScale or 0.75
+                local offset = (1 - scale) / 2
+                local icon = Instance.new("ImageLabel")
+                icon.Name = "CustomIcon"
+                icon.Size = UDim2.new(scale, 0, scale, 0)
+                icon.Position = UDim2.new(offset, 0, offset, 0)
+                icon.BackgroundTransparency = 1
+                icon.Image = string.format("rbxthumb://type=Asset&id=%s&w=420&h=420", decalId)
+                icon.ImageTransparency = 0
+                icon.ScaleType = Enum.ScaleType.Fit
+                icon.ZIndex = 3
+                icon.Parent = btn
+            end
+
+            btn.Visible = true
+            btn.Parent = MainFrame
+            return btn
+        end
+
+        local leftBtn = touchControlFrame:FindFirstChild("LeftButton")
+        local rightBtn = touchControlFrame:FindFirstChild("RightButton")
+
+        local verticalGap = -3 
+        local leftOffset = -4
+
+        if leftBtn and rightBtn then
+            MainFrame.Size = rightBtn.Size
+            local defaultPos = UDim2.new(
+                rightBtn.Position.X.Scale, rightBtn.Position.X.Offset + leftOffset,
+                rightBtn.Position.Y.Scale, rightBtn.Position.Y.Offset - rightBtn.AbsoluteSize.Y - verticalGap
+            )
+            MainFrame.Position = defaultPos
+
+            self.ResetButtonPosition = function()
+                MainFrame.Position = defaultPos
+            end
+            
+            local nativeSize = rightBtn.AbsoluteSize
+            local smallerSize = UDim2.new(0, nativeSize.X * 0.85, 0, nativeSize.Y * 0.85)
+            local offsetStep = (nativeSize.X * 0.85) * 0.52
+            
+            local MinusBtn  = makeButton("MinusBtn", smallerSize, UDim2.new(0, -offsetStep, 0.5, 0), "15396334032", 0.75)
+            local PlusBtn   = makeButton("PlusBtn",  smallerSize, UDim2.new(0,  offsetStep, 0.5, 0), "1419621057", 0.75)
+            local ToggleBtn = makeButton("ToggleBtn", UDim2.new(0, nativeSize.X * 0.7, 0, nativeSize.Y * 0.7), UDim2.new(0, 0, 0.5, -nativeSize.Y * 0.72), "111716979356360", 0.6)
+
+            local toggleIcon = ToggleBtn:FindFirstChild("CustomIcon")
+            if toggleIcon then
+                toggleIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
+            end
+
+            local isDragging = false
+            local dragStart, startPos
+
+            local function setupDrag(btn)
+                btn.InputBegan:Connect(function(input)
+                    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and self.Unlocked then
+                        isDragging = true
+                        dragStart = input.Position
+                        startPos = MainFrame.Position
+                    end
+                end)
+            end
+
+            setupDrag(ToggleBtn)
+            setupDrag(PlusBtn)
+            setupDrag(MinusBtn)
+
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    isDragging = false
+                end
+            end)
+
+            UserInputService.InputChanged:Connect(function(input)
+                if not self.Unlocked then
+                    isDragging = false
+                    return
+                end
+                if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and isDragging then
+                    local delta = input.Position - dragStart
+                    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                end
+            end)
+
+            if callbacks then
+                if callbacks.OnToggle then
+                    ToggleBtn.MouseButton1Click:Connect(function()
+                        if not self.Unlocked then
+                            callbacks.OnToggle()
+                        end
+                    end)
+                end
+
+                if callbacks.OnPlus then
+                    PlusBtn.MouseButton1Click:Connect(function()
+                        if not self.Unlocked then
+                            callbacks.OnPlus()
+                        end
+                    end)
+                end
+
+                if callbacks.OnMinus then
+                    MinusBtn.MouseButton1Click:Connect(function()
+                        if not self.Unlocked then
+                            callbacks.OnMinus()
+                        end
+                    end)
+                end
+            end
+        end
+    end
+
+    return self
+end
+
+return Library
