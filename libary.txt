@@ -1,0 +1,470 @@
+local CaterUI = {}
+CaterUI.__index = CaterUI
+
+function CaterUI.new(title)
+    local self = setmetatable({}, CaterUI)
+    
+    local Players = game:GetService("Players")
+    local UserInputService = game:GetService("UserInputService")
+    local CoreGui = game:GetService("CoreGui")
+    local P = Players.LocalPlayer
+
+    self.Title = title or "Script Menu"
+    self.Unlocked = false
+    self.ResetPositionFunc = nil
+
+    self.PersistentParent = (gethui and gethui()) or CoreGui:FindFirstChild("CoreGui") or CoreGui
+    self.PersistentGui = CoreGui:FindFirstChild("CaterPersistentGui")
+    if not self.PersistentGui then
+        self.PersistentGui = Instance.new("ScreenGui")
+        self.PersistentGui.Name = "CaterPersistentGui"
+        self.PersistentGui.ResetOnSpawn = false
+        self.PersistentGui.DisplayOrder = 99999
+        self.PersistentGui.IgnoreGuiInset = true
+        pcall(function() self.PersistentGui.Parent = self.PersistentParent end)
+        if not self.PersistentGui.Parent then self.PersistentGui.Parent = P:WaitForChild("PlayerGui") end
+    end
+
+    local oldFrame = self.PersistentGui:FindFirstChild("MainFrame")
+    if oldFrame then oldFrame:Destroy() end
+
+    self.MainFrame = Instance.new("Frame")
+    self.MainFrame.Name = "MainFrame"
+    self.MainFrame.BackgroundTransparency = 1
+    self.MainFrame.Parent = self.PersistentGui
+
+    self.NotifGui = Instance.new("ScreenGui")
+    self.NotifGui.Name = "CaterNotificationGui"
+    self.NotifGui.ResetOnSpawn = false
+    self.NotifGui.DisplayOrder = 999999
+    self.NotifGui.IgnoreGuiInset = true
+    pcall(function() self.NotifGui.Parent = self.PersistentParent end)
+    if not self.NotifGui.Parent then self.NotifGui.Parent = P:WaitForChild("PlayerGui") end
+
+    P.Chatted:Connect(function(msg)
+        self:ProcessCommand(msg:lower())
+    end)
+
+    return self
+end
+
+function CaterUI:ProcessCommand(lowerMsg)
+    if lowerMsg == "/e unlock" then
+        self.Unlocked = true
+        self:Notify("Unlocked! You can drag buttons.")
+    elseif lowerMsg == "/e lock" then
+        self.Unlocked = false
+        self:Notify("Locked! Button positions secured.")
+    elseif lowerMsg == "/e reset" then
+        if self.ResetPositionFunc then
+            self.ResetPositionFunc()
+            self:Notify("Reset button positions to default!")
+        end
+    end
+end
+
+function CaterUI:Notify(message, subtext)
+    local TweenService = game:GetService("TweenService")
+    local singleNotifGui = Instance.new("ScreenGui")
+    singleNotifGui.Name = "ActiveCaterNotif"
+    singleNotifGui.ResetOnSpawn = false
+    singleNotifGui.DisplayOrder = 999999
+    singleNotifGui.IgnoreGuiInset = true
+    pcall(function() singleNotifGui.Parent = self.NotifGui.Parent end)
+
+    local notifFrame = Instance.new("Frame")
+    notifFrame.Size = UDim2.new(0, 200, 0, subtext and 52 or 40)
+    notifFrame.Position = UDim2.new(1, 20, 1, subtext and -65 or -50)
+    notifFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+    notifFrame.BackgroundTransparency = 0.05
+    notifFrame.BorderSizePixel = 0
+    notifFrame.Parent = singleNotifGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = notifFrame
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 190, 255)
+    stroke.Thickness = 1.5
+    stroke.Parent = notifFrame
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 170, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 80, 255))
+    })
+    gradient.Parent = stroke
+
+    local accent = Instance.new("Frame")
+    accent.Size = UDim2.new(0, 4, 1, 0)
+    accent.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    accent.BorderSizePixel = 0
+    accent.Parent = notifFrame
+
+    local accentCorner = Instance.new("UICorner")
+    accentCorner.CornerRadius = UDim.new(0, 3)
+    accentCorner.Parent = accent
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -15, 0, 16)
+    titleLabel.Position = UDim2.new(0, 10, 0, 4)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = self.Title
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextSize = 11
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Parent = notifFrame
+
+    local descLabel = Instance.new("TextLabel")
+    descLabel.Size = UDim2.new(1, -15, 0, subtext and 16 or 18)
+    descLabel.Position = UDim2.new(0, 10, 0, 18)
+    descLabel.BackgroundTransparency = 1
+    descLabel.Text = message
+    descLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
+    descLabel.TextSize = 9.5
+    descLabel.Font = Enum.Font.Gotham
+    descLabel.Parent = notifFrame
+
+    if subtext then
+        local subLabel = Instance.new("TextLabel")
+        subLabel.Size = UDim2.new(1, -15, 0, 14)
+        subLabel.Position = UDim2.new(0, 10, 0, 34)
+        subLabel.BackgroundTransparency = 1
+        subLabel.Text = subtext
+        subLabel.TextColor3 = Color3.fromRGB(0, 190, 255)
+        subLabel.TextSize = 8.5
+        subLabel.Font = Enum.Font.GothamBold
+        subLabel.Parent = notifFrame
+    end
+
+    local targetY = subtext and -65 or -50
+    TweenService:Create(notifFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Position = UDim2.new(1, -215, 1, targetY)
+    }):Play()
+
+    task.delay(subtext and 6 or 3, function()
+        local tweenOut = TweenService:Create(notifFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+            Position = UDim2.new(1, 20, 1, targetY)
+        })
+        tweenOut:Play()
+        tweenOut.Completed:Connect(function() singleNotifGui:Destroy() end)
+    end)
+end
+
+function CaterUI:CreateMobileLayout(callbacks)
+    local Players = game:GetService("Players")
+    local UserInputService = game:GetService("UserInputService")
+    local P = Players.LocalPlayer
+    local playerGui = P:WaitForChild("PlayerGui", 10)
+    local touchControlFrame
+    
+    while not touchControlFrame do
+        local startFolder = playerGui and playerGui:FindFirstChild("Start", true)
+        touchControlFrame = startFolder and startFolder:FindFirstChild("TouchControlFrame", true)
+        if not touchControlFrame then task.wait(0.2) end
+    end
+
+    local leftBtn = touchControlFrame:FindFirstChild("LeftButton")
+    local rightBtn = touchControlFrame:FindFirstChild("RightButton")
+
+    if leftBtn and rightBtn then
+        self.MainFrame.Size = rightBtn.Size
+        local defaultPos = UDim2.new(
+            rightBtn.Position.X.Scale, rightBtn.Position.X.Offset - 4,
+            rightBtn.Position.Y.Scale, rightBtn.Position.Y.Offset - rightBtn.AbsoluteSize.Y - 3
+        )
+        self.MainFrame.Position = defaultPos
+
+        self.ResetPositionFunc = function()
+            self.MainFrame.Position = defaultPos
+        end
+        
+        local nativeSize = rightBtn.AbsoluteSize
+        local smallerSize = UDim2.new(0, nativeSize.X * 0.85, 0, nativeSize.Y * 0.85)
+        local offsetStep = (nativeSize.X * 0.85) * 0.52
+        
+        local function makeBtn(name, size, pos, decalId)
+            local btn = Instance.new("ImageButton")
+            btn.Name = name
+            btn.Size = size
+            btn.AnchorPoint = Vector2.new(0.5, 0.5)
+            btn.Position = pos
+            btn.Style = Enum.ButtonStyle.Custom
+            btn.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+            btn.BackgroundTransparency = 0.35
+            btn.BorderSizePixel = 0
+            btn.AutoButtonColor = true
+            btn.Active = true
+            btn.Selectable = true
+            btn.ZIndex = 100
+            btn.Image = ""
+
+            local bgCorner = Instance.new("UICorner")
+            bgCorner.CornerRadius = UDim.new(1, 0)
+            bgCorner.Parent = btn
+
+            local bgStroke = Instance.new("UIStroke")
+            bgStroke.Color = Color3.fromRGB(255, 255, 255)
+            bgStroke.Transparency = 0.5
+            bgStroke.Thickness = 1.5
+            bgStroke.Parent = btn
+
+            if decalId then
+                local icon = Instance.new("ImageLabel")
+                icon.Size = UDim2.new(0.65, 0, 0.65, 0)
+                icon.Position = UDim2.new(0.175, 0, 0.175, 0)
+                icon.BackgroundTransparency = 1
+                icon.Image = string.format("rbxthumb://type=Asset&id=%s&w=420&h=420", decalId)
+                icon.ImageColor3 = Color3.fromRGB(255, 255, 255)
+                icon.ScaleType = Enum.ScaleType.Fit
+                icon.ZIndex = 101
+                icon.Parent = btn
+            end
+
+            btn.Parent = self.MainFrame
+            return btn
+        end
+
+        local MinusBtn  = makeBtn("MinusBtn", smallerSize, UDim2.new(0, -offsetStep, 0.5, 0), "15396334032")
+        local PlusBtn   = makeBtn("PlusBtn",  smallerSize, UDim2.new(0,  offsetStep, 0.5, 0), "1419621057")
+        local ToggleBtn = makeBtn("ToggleBtn", UDim2.new(0, nativeSize.X * 0.7, 0, nativeSize.Y * 0.7), UDim2.new(0, 0, 0.5, -nativeSize.Y * 0.72), "111716979356360")
+
+        local isDragging = false
+        local dragStart, startPos
+
+        local function setupDrag(btn)
+            btn.InputBegan:Connect(function(input)
+                if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and self.Unlocked then
+                    isDragging = true
+                    dragStart = input.Position
+                    startPos = self.MainFrame.Position
+                end
+            end)
+        end
+
+        setupDrag(ToggleBtn)
+        setupDrag(PlusBtn)
+        setupDrag(MinusBtn)
+
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                isDragging = false
+            end
+        end)
+
+        UserInputService.InputChanged:Connect(function(input)
+            if not self.Unlocked then isDragging = false return end
+            if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and isDragging then
+                local delta = input.Position - dragStart
+                self.MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+
+        if callbacks then
+            if callbacks.OnToggle then ToggleBtn.MouseButton1Click:Connect(function() if not self.Unlocked then callbacks.OnToggle() end end) end
+            if callbacks.OnPlus then PlusBtn.MouseButton1Click:Connect(function() if not self.Unlocked then callbacks.OnPlus() end end) end
+            if callbacks.OnMinus then MinusBtn.MouseButton1Click:Connect(function() if not self.Unlocked then callbacks.OnMinus() end end) end
+        end
+    end
+end
+
+function CaterUI:CreateWindow(windowTitle)
+    local WindowObj = {}
+    
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "CaterWindowGui"
+    gui.ResetOnSpawn = false
+    gui.DisplayOrder = 99998
+    gui.IgnoreGuiInset = true
+    pcall(function() gui.Parent = self.PersistentParent end)
+
+    local mainWin = Instance.new("Frame")
+    mainWin.Size = UDim2.new(0, 220, 0, 260)
+    mainWin.Position = UDim2.new(0.05, 0, 0.3, 0)
+    mainWin.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    mainWin.BorderSizePixel = 0
+    mainWin.Active = true
+    mainWin.Draggable = true
+    mainWin.Parent = gui
+
+    local winCorner = Instance.new("UICorner")
+    winCorner.CornerRadius = UDim.new(0, 10)
+    winCorner.Parent = mainWin
+
+    local winStroke = Instance.new("UIStroke")
+    winStroke.Color = Color3.fromRGB(0, 170, 255)
+    winStroke.Thickness = 1.5
+    winStroke.Parent = mainWin
+
+    local header = Instance.new("TextLabel")
+    header.Size = UDim2.new(1, 0, 0, 30)
+    header.BackgroundTransparency = 1
+    header.Text = windowTitle or self.Title
+    header.TextColor3 = Color3.fromRGB(255, 255, 255)
+    header.TextSize = 13
+    header.Font = Enum.Font.GothamBold
+    header.Parent = mainWin
+
+    local container = Instance.new("ScrollingFrame")
+    container.Size = UDim2.new(1, -10, 1, -35)
+    container.Position = UDim2.new(0, 5, 0, 32)
+    container.BackgroundTransparency = 1
+    container.BorderSizePixel = 0
+    container.CanvasSize = UDim2.new(0, 0, 0, 0)
+    container.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    container.Parent = mainWin
+
+    local layout = Instance.new("UIListLayout")
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 6)
+    layout.Parent = container
+
+    function WindowObj:AddSlider(text, min, max, default, callback)
+        local sliderFrame = Instance.new("Frame")
+        sliderFrame.Size = UDim2.new(1, -5, 0, 42)
+        sliderFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+        sliderFrame.BorderSizePixel = 0
+        sliderFrame.Parent = container
+
+        local scCorner = Instance.new("UICorner")
+        scCorner.CornerRadius = UDim.new(0, 6)
+        scCorner.Parent = sliderFrame
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, -10, 0, 18)
+        label.Position = UDim2.new(0, 6, 0, 3)
+        label.BackgroundTransparency = 1
+        label.Text = text .. ": " .. tostring(default)
+        label.TextColor3 = Color3.fromRGB(220, 220, 220)
+        label.TextSize = 10
+        label.Font = Enum.Font.Gotham
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = sliderFrame
+
+        local bar = Instance.new("TextButton")
+        bar.Size = UDim2.new(1, -12, 0, 12)
+        bar.Position = UDim2.new(0, 6, 0, 24)
+        bar.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        bar.Text = ""
+        bar.AutoButtonColor = false
+        bar.Parent = sliderFrame
+
+        local bCorner = Instance.new("UICorner")
+        bCorner.CornerRadius = UDim.new(1, 0)
+        bCorner.Parent = bar
+
+        local fill = Instance.new("Frame")
+        fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+        fill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        fill.BorderSizePixel = 0
+        fill.Parent = bar
+
+        local fCorner = Instance.new("UICorner")
+        fCorner.CornerRadius = UDim.new(1, 0)
+        fCorner.Parent = fill
+
+        local dragging = false
+        local function updateSlider(input)
+            local pos = math.clamp((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+            fill.Size = UDim2.new(pos, 0, 1, 0)
+            local val = math.floor(min + ((max - min) * pos))
+            label.Text = text .. ": " .. tostring(val)
+            if callback then callback(val) end
+        end
+
+        bar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                updateSlider(input)
+            end
+        end)
+
+        game:GetService("UserInputService").InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+
+        game:GetService("UserInputService").InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                updateSlider(input)
+            end
+        end)
+    end
+
+    function WindowObj:AddTextbox(placeholder, callback)
+        local tbFrame = Instance.new("Frame")
+        tbFrame.Size = UDim2.new(1, -5, 0, 32)
+        tbFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+        tbFrame.BorderSizePixel = 0
+        tbFrame.Parent = container
+
+        local tbCorner = Instance.new("UICorner")
+        tbCorner.CornerRadius = UDim.new(0, 6)
+        tbCorner.Parent = tbFrame
+
+        local box = Instance.new("TextBox")
+        box.Size = UDim2.new(1, -10, 1, 0)
+        box.Position = UDim2.new(0, 5, 0, 0)
+        box.BackgroundTransparency = 1
+        box.PlaceholderText = placeholder or "Enter text..."
+        box.Text = ""
+        box.TextColor3 = Color3.fromRGB(255, 255, 255)
+        box.PlaceholderColor3 = Color3.fromRGB(130, 130, 130)
+        box.TextSize = 10
+        box.Font = Enum.Font.Gotham
+        box.TextXAlignment = Enum.TextXAlignment.Left
+        box.Parent = tbFrame
+
+        box.FocusLost:Connect(function(enterPressed)
+            if callback then callback(box.Text, enterPressed) end
+        end)
+    end
+
+    function WindowObj:AddToggle(text, defaultState, callback)
+        local toggled = defaultState or false
+        local tFrame = Instance.new("TextButton")
+        tFrame.Size = UDim2.new(1, -5, 0, 30)
+        tFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+        tFrame.Text = ""
+        tFrame.AutoButtonColor = false
+        tFrame.Parent = container
+
+        local tCorner = Instance.new("UICorner")
+        tCorner.CornerRadius = UDim.new(0, 6)
+        tCorner.Parent = tFrame
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, -35, 1, 0)
+        label.Position = UDim2.new(0, 8, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Text = text
+        label.TextColor3 = Color3.fromRGB(220, 220, 220)
+        label.TextSize = 10
+        label.Font = Enum.Font.Gotham
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = tFrame
+
+        local indicator = Instance.new("Frame")
+        indicator.Size = UDim2.new(0, 16, 0, 16)
+        indicator.Position = UDim2.new(1, -22, 0.5, -8)
+        indicator.BackgroundColor3 = toggled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 60)
+        indicator.BorderSizePixel = 0
+        indicator.Parent = tFrame
+
+        local iCorner = Instance.new("UICorner")
+        iCorner.CornerRadius = UDim.new(0, 4)
+        iCorner.Parent = indicator
+
+        tFrame.MouseButton1Click:Connect(function()
+            toggled = not toggled
+            indicator.BackgroundColor3 = toggled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 60)
+            if callback then callback(toggled) end
+        end)
+    end
+
+    return WindowObj
+end
+
+return CaterUI
